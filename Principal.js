@@ -12,6 +12,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Ingresos from './Ingresos';
 import Salidas from './Salidas';
+import Metas from './Metas';
 
 const Stack = createNativeStackNavigator();
 
@@ -58,10 +59,10 @@ function Principal({navigation}) {
             <MaterialIcons name="money-off" size={24} color="black" />
             <Text>Gastos</Text>
           </TouchableOpacity>
-          <View style={styles.recatangulo}>
+         <TouchableOpacity style={styles.recatangulo} onPress={() => navigation.navigate('Metas')}>
             <MaterialCommunityIcons name="bullseye-arrow" size={24} color="black" />
             <Text>Metas</Text>
-          </View>
+          </TouchableOpacity>
           <View style={styles.recatangulo}>
             <Feather name="book-open" size={24} color="black" />
             <Text>Historial</Text>
@@ -78,6 +79,8 @@ export default function App() {
         <Stack.Screen name="Principal" component={Principal} options={{ headerShown: false }} />
         <Stack.Screen name="Ingresos" component={Ingresos} options={{ headerShown: false }} />
         <Stack.Screen name="Salidas" component={Salidas} options={{ headerShown: false }} />
+        <Stack.Screen name="Metas" component={Metas} options={{ headerShown: false }} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );
