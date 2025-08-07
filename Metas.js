@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, TextInput, Platform, Modal } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, TextInput, Platform } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -77,41 +77,18 @@ export default function Metas({ navigation }) {
                 </View>
 
                 {/* Date Picker para Android en Modal, para iOS directo */}
-                {Platform.OS === 'android' && (
-                    <Modal
-                        visible={mostrarPicker}
-                        transparent={true}
-                        animationType="fade"
-                        onRequestClose={() => setMostrarPicker(false)}
-                    >
-                        <View style={styles.modalFondo}>
-                            <View style={styles.modalContenido}>
-                                <DateTimePicker
-                                    value={fechaTemporal}
-                                    mode="date"
-                                    display="spinner"
-                                    onChange={(event, selectedDate) => {
-                                        if (selectedDate) setFechaTemporal(selectedDate);
-                                    }}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setFecha(fechaTemporal);
-                                        setMostrarPicker(false);
-                                    }}
-                                    style={{ marginTop: 10, alignItems: 'center' }}
-                                >
-                                    <Text style={{ color: '#007BFF', fontSize: 16 }}>Listo</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={() => setMostrarPicker(false)}
-                                    style={{ marginTop: 10, alignItems: 'center' }}
-                                >
-                                    <Text style={{ color: '#FF3333', fontSize: 16 }}>Cancelar</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </Modal>
+                {Platform.OS === 'android' && mostrarPicker && (
+                    <DateTimePicker
+                        value={fecha}
+                        mode="date"
+                        display="calendar"
+                        onChange={(event, selectedDate) => {
+                            setMostrarPicker(false);
+                            if (selectedDate) {
+                                setFecha(selectedDate);
+                            }
+                        }}
+                    />
                 )}
                 {Platform.OS === 'ios' && mostrarPicker && (
                     <View style={styles.iosPicker}>
