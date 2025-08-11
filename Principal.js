@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, Image, Button, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
@@ -10,28 +10,67 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+import { auth, db } from './firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore'; // 
+
 import Ingresos from './Ingresos';
 import Salidas from './Salidas';
 import Metas from './Metas';
+import historial from './historial';
+import login from './login';
+import registro from './registro';
+
 
 const Stack = createNativeStackNavigator();
 
-function Principal({navigation}) {
+function Principal({ navigation }) {
   const [inputValue, setInputValue] = useState('');
+  const [userName, setUserName] = useState('...');
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const userDocRef = doc(db, 'usuarios', user.uid);
+        try {
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData && userData.nombre) {
+              setUserName(userData.nombre);
+            } else {
+              setUserName(user.email ? user.email.split('@')[0] : 'Usuario');
+            }
+          } else {
+            setUserName(user.email ? user.email.split('@')[0] : 'Usuario');
+          }
+        } catch (error) {
+          console.error("Error al obtener datos del usuario de Firestore:", error);
+          setUserName(user.email ? user.email.split('@')[0] : 'Usuario');
+        }
+      } else {
+        setUserName('Invitado');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   const data = [
     { name: 'Salidas', population: 30, color: '#FFB3B3', legendFontColor: 'black', legendFontSize: 15 },
     { name: 'Ahorros', population: 70, color: '#B3D9FF', legendFontColor: 'black', legendFontSize: 15 },
     { name: 'Ingresos', population: 50, color: '#B3FFB3', legendFontColor: 'black', legendFontSize: 15 },
   ];
   return (
-    <SafeAreaView style={styles.safeArea}>{
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="auto" />
       <View style={styles.container}>
         <View style={styles.nav}>
           <Text style={{ fontSize: 20, fontWeight: 'bold' }}>Cash</Text>
           <FontAwesome name="gear" size={30} color="black" />
         </View>
         <View style={styles.bienvenida}>
-          <Text style={styles.bienvenidatext}>¡Hola, Nombre¡</Text>
+          <Text style={styles.bienvenidatext}>¡Hola, {userName}!</Text>
         </View>
         <View style={styles.textoapoyo}>
           <Text>Resumen financiero:</Text>
@@ -50,37 +89,40 @@ function Principal({navigation}) {
           />
         </View>
         <View style={styles.Containerrect}>
-         <TouchableOpacity style={styles.recatangulo} onPress={() => navigation.navigate('Ingresos')}>
+          <TouchableOpacity style={styles.recatangulo} onPress={() => navigation.navigate('Ingresos')}>
             <FontAwesome5 name="money-bill-wave" size={24} color="black" />
             <Text>Ingresos</Text>
           </TouchableOpacity>
-          
-         <TouchableOpacity style={styles.recatangulo} onPress={() => navigation.navigate('Salidas')}>
+
+          <TouchableOpacity style={styles.recatangulo} onPress={() => navigation.navigate('Salidas')}>
             <MaterialIcons name="money-off" size={24} color="black" />
             <Text>Gastos</Text>
           </TouchableOpacity>
-         <TouchableOpacity style={styles.recatangulo} onPress={() => navigation.navigate('Metas')}>
+          <TouchableOpacity style={styles.recatangulo} onPress={() => navigation.navigate('Metas')}>
             <MaterialCommunityIcons name="bullseye-arrow" size={24} color="black" />
             <Text>Metas</Text>
           </TouchableOpacity>
-          <View style={styles.recatangulo}>
+          <TouchableOpacity style={styles.recatangulo} onPress={() => navigation.navigate('historial')}>
             <Feather name="book-open" size={24} color="black" />
             <Text>Historial</Text>
-          </View>
+          </TouchableOpacity>
         </View>
-      </View>      
-    }</SafeAreaView>
+      </View>
+    </SafeAreaView >
   );
 }
+
 export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator>
+        <Stack.Screen name="login" component={login} options={{ headerShown: false }} />
+        <Stack.Screen name="registro" component={registro} options={{ headerShown: false }} />
         <Stack.Screen name="Principal" component={Principal} options={{ headerShown: false }} />
         <Stack.Screen name="Ingresos" component={Ingresos} options={{ headerShown: false }} />
         <Stack.Screen name="Salidas" component={Salidas} options={{ headerShown: false }} />
         <Stack.Screen name="Metas" component={Metas} options={{ headerShown: false }} />
-
+        <Stack.Screen name="historial" component={historial} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -143,13 +185,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
 
-    
+
   },
   textoapoyo: {
     width: '100%',
     marginTop: 30,
     marginLeft: 20,
-    fontSize: 60,
     fontWeight: 'bold',
     color: '#333',
   }
