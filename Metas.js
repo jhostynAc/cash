@@ -66,14 +66,16 @@ export default function Metas({ navigation }) {
             const fetchedMetas = [];
             snapshot.forEach((doc) => {
                 const data = doc.data();
+                // ** MEJORA: Aseguramos que 'fecha' siempre sea un objeto Date válido **
+                // Usamos el operador de encadenamiento opcional para evitar errores si 'fecha' o 'toDate' no existen
+                const metaFecha = data.fecha?.toDate ? data.fecha.toDate() : new Date();
                 fetchedMetas.push({
                     id: doc.id,
                     nombre: data.nombre,
                     cantidad: parseFloat(data.cantidad || 0),
                     aporte: parseFloat(data.aporte || 0),
-                    // AQUÍ YA LO ESTABAS HACIENDO BIEN: CONVIERTES EL TIMESTAMP A OBJETO Date
-                    fecha: data.fecha?.toDate ? data.fecha.toDate() : new Date(),
-                    fechaDisplay: data.fecha?.toDate ? data.fecha.toDate().toLocaleDateString('es-CO') : 'Fecha desconocida',
+                    fecha: metaFecha, // Ya es un Date
+                    fechaDisplay: metaFecha.toLocaleDateString('es-CO'),
                     cumplida: data.cumplida || false, // Campo 'cumplida', por defecto falso
                 });
             });
@@ -192,15 +194,17 @@ export default function Metas({ navigation }) {
     const handleEditPress = (meta) => {
         console.log('handleEditPress llamado para meta:', meta.id); // Log para depuración
         console.log('Tipo de meta.fecha al abrir modal:', typeof meta.fecha, meta.fecha); // ¡CRUCIAL para depurar!
+
+        // ** SOLUCIÓN: Aseguramos que 'meta.fecha' siempre sea un objeto Date **
+        // Esto previene TypeErrors al llamar a .toLocaleDateString()
+        const initialDate = (meta.fecha instanceof Date && !isNaN(meta.fecha)) ? meta.fecha : new Date(); // Fallback robusto
+
         setEditingMetaId(meta.id);
         setEditNombre(meta.nombre);
         setEditCantidad(meta.cantidad.toString());
         setEditAporte(meta.aporte.toString());
-        // --- CAMBIO CLAVE AQUÍ: Aseguramos que 'meta.fecha' siempre sea un objeto Date
-        //                       o que se inicialice con la fecha actual si es 'null' o 'undefined'.
-        //                       Esto previene TypeErrors al llamar a .toLocaleDateString() ---
-        setEditFecha(meta.fecha || new Date());
-        setEditFechaTemporal(meta.fecha || new Date()); // Para el picker del modal de edición
+        setEditFecha(initialDate); // La fecha que se mostrará en el input de edición
+        setEditFechaTemporal(initialDate); // La fecha inicial para el DatePicker de edición
         setShowEditModal(true);
     };
 
@@ -460,6 +464,7 @@ export default function Metas({ navigation }) {
                     </View>
                 </Modal>
             )}
+            {/* OJO: Este DatePicker de AÑADIR para iOS se muestra pegado al bottom, no como alerta */}
             {Platform.OS === 'ios' && mostrarPicker && (
                 <View style={styles.iosPicker}>
                     <DateTimePicker
@@ -525,8 +530,10 @@ export default function Metas({ navigation }) {
                             onPress={() => {
                                 console.log('--- TAP EN FECHA EDITAR ---'); // << Este log seguirá apareciendo
                                 console.log('Abriendo DatePicker (Editar)');
-                                setEditFechaTemporal(editFecha);
-                                setShowEditDatePicker(true); // Esto activa el DatePicker en su propio modal (el que movimos)
+                                // ** SOLUCIÓN: Aseguramos que editFechaTemporal tenga el valor correcto **
+                                setEditFechaTemporal(editFecha); // Pasamos la fecha actual de edición al picker temporal
+                                console.log('editFecha al abrir picker:', editFecha, 'Tipo:', typeof editFecha); // Log de depuración
+                                setShowEditDatePicker(true); // Esto activa el DatePicker en su propio modal
                             }}
                             style={[styles.inputModal, styles.fechaInputModal]}
                             activeOpacity={0.7}
@@ -559,7 +566,12 @@ export default function Metas({ navigation }) {
             </Modal>
 
             {/* --- Date Picker para EDICIÓN --- */}
-            {/* ¡¡¡ESTOS MODALES FUERON MOVIDOS AQUÍ PARA SER HERMANOS DEL MODAL DE EDICIÓN!!! */}
+            {/* ¡¡¡Estos Modales de DatePicker son HERMANOS del Modal de edición principal!!! */}
+            {/* Esto asegura que se superpongan a cualquier otro Modal si se abren */}
+
+            {/* Log para verificar el estado de la visibilidad del modal del DatePicker de edición */}
+            {console.log('ESTADO showEditDatePicker para iOS (Modal de edición fecha):', showEditDatePicker ? 'TRUE' : 'FALSE', 'Tipo:', typeof showEditDatePicker)}
+
             {/* DatePicker de EDICIÓN para Android */}
             {Platform.OS === 'android' && (
                 <Modal
@@ -592,21 +604,22 @@ export default function Metas({ navigation }) {
                 </Modal>
             )}
 
-            {/* DatePicker de EDICIÓN para iOS */}
+            {/* ** DatePicker de EDICIÓN para iOS como ALERTA (Con Modal y estilo centrado) ** */}
+            {/* Este Modal y su estilo `iosPickerEditCentered` son clave para el efecto de alerta. */}
+            {/* Al ser un Modal separado, se superpone a tu Modal de edición principal. */}
             {Platform.OS === 'ios' && (
                 <Modal
                     visible={showEditDatePicker}
                     transparent={true}
-                    animationType="fade"
+                    animationType="fade" // Puedes usar 'slide' o 'none' también
                     onRequestClose={() => setShowEditDatePicker(false)}
                 >
-                    <View style={styles.modalFondo}>
-                        <View style={styles.iosPickerEditCentered}> {/* <--- ¡EL CAMBIO CRÍTICO ESTÁ AQUÍ! */}
+                    <View style={styles.modalFondo}> {/* Este modalFondo asegura el oscurecimiento y centrado */}
+                        <View style={styles.iosPickerEditCentered}> {/* <--- ¡ESTE ES EL CONTENEDOR DE TU ALERTA! */}
                             <DateTimePicker
                                 value={editFechaTemporal}
                                 mode="date"
-                                // 'default' o 'spinner' para iOS
-                                display={Platform.OS === 'ios' ? 'default' : 'spinner'}
+                                display="spinner" // 'spinner' es el más común para iOS en alertas
                                 onChange={(event, selectedDate) => {
                                     if (selectedDate) setEditFechaTemporal(selectedDate);
                                 }}
@@ -875,15 +888,14 @@ const styles = StyleSheet.create({
         zIndex: 1000,
         height: 250,
     },
-    // --- NUEVO ESTILO PARA EL DATEPICKER DE EDICIÓN EN IOS (Centrado como alerta) ---
+    // --- ESTILO PARA EL DATEPICKER DE EDICIÓN EN IOS (Centrado como alerta) ---
     iosPickerEditCentered: {
         backgroundColor: '#fff',
         borderRadius: 10,
         padding: 20,
         alignItems: 'center',
-        width: '80%', // <-- Ocupa el 80% del ancho del modalFondo
-        // No necesitamos position: 'absolute' porque modalFondo ya lo centrará
-        zIndex: 1000,
+        width: '80%', // Ocupa el 80% del ancho del modalFondo para darle apariencia de alerta
+        zIndex: 1000, // Asegura que esté por encima de otros elementos en la misma capa
         height: 250, // Mantener altura para el spinner
     },
 });

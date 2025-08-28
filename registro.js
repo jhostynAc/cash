@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, TextInput, Alert } from 'react-native';
-
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { auth, db } from './firebase'; 
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -24,54 +23,46 @@ export default function Registro({ navigation }) {
         }
 
         setLoading(true); 
-        console.log('Inicio de handleRegister. Loading puesto a true.'); 
+        let timeoutId; 
 
         try {
-            console.log('Intentando crear usuario en Firebase Authentication...'); 
             const userCredential = await createUserWithEmailAndPassword(auth, correo, contrasena);
             const user = userCredential.user;
-            console.log('Usuario registrado exitosamente en Auth:', user.email, 'UID:', user.uid); 
-            
-            console.log('Intentando guardar datos de usuario en Cloud Firestore para UID:', user.uid); 
-            
-            const writePromise = setDoc(doc(db, 'usuarios', user.uid), {
+            const writePromise = setDoc(doc(db, 'users', user.uid), {
                 nombre: nombre,
                 apellidos: apellidos,
                 correo: correo,
                 createdAt: new Date(),
             });
 
-            const TIMEOUT_DURATION = 30000; 
-            const timeoutPromise = new Promise((resolve, reject) => {
-                const id = setTimeout(() => {
-                    clearTimeout(id);
+            const TIMEOUT_DURATION = 30000;
+            const timeout = new Promise((resolve, reject) => {
+                timeoutId = setTimeout(() => {
                     reject(new Error('La operación de guardado de datos tomó demasiado tiempo. Inténtalo de nuevo.'));
                 }, TIMEOUT_DURATION);
             });
 
-            await Promise.race([writePromise, timeoutPromise]);
-            
-            console.log('Datos de usuario guardados exitosamente en Firestore para UID:', user.uid); 
+            await Promise.race([writePromise, timeout]);
+            clearTimeout(timeoutId);
+
             setLoading(false); 
-            console.log('Preparando para mostrar alerta de éxito...'); 
 
             Alert.alert(
                 'Éxito', 
-                `¡Bienvenido, ${nombre}! Tu cuenta ha sido creada. Ahora puedes iniciar sesión.`, 
+                `¡Bienvenido, ${nombre}! Tu cuenta ha sido creada y has iniciado sesión.`, 
                 [ 
                     {
                         text: 'OK', 
                         onPress: () => {
-                            console.log('Usuario presionó OK en la alerta. Navegando a Login...'); 
-                            navigation.navigate('Login'); 
+                            navigation.replace('Principal'); 
                         }
                     }
                 ] 
             );
-            console.log('Alerta de éxito invocada.');
-
         } catch (error) { 
-            console.error('Error en el proceso de registro (catch block):', error); 
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
             let errorMessage = 'Ocurrió un error inesperado al registrarse. Inténtalo de nuevo.';
 
             if (error && typeof error === 'object' && error.code) { 
@@ -87,11 +78,7 @@ export default function Registro({ navigation }) {
                 errorMessage = 'Problema de conexión: Los datos tardaron mucho en guardarse. Tu cuenta puede haberse creado, pero intenta iniciar sesión en un momento.';
             }
 
-            console.log('Preparando para mostrar alerta de error...'); 
             Alert.alert('Error de Registro', errorMessage);
-            console.error('Detalle del error de Firebase (para depuración):', error); 
-            console.log('Alerta de error invocada.'); 
-
             setLoading(false); 
         }
     };

@@ -2,70 +2,56 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, SafeAreaView, TextInput, Alert, ActivityIndicator } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
-
-// Importa Firebase
 import { auth, db } from './firebase'; 
-import { collection, addDoc, query, orderBy, where, onSnapshot } from 'firebase/firestore'; // ¡Añadimos 'where'!
+import { collection, addDoc, query, orderBy, where, onSnapshot } from 'firebase/firestore'; 
 import { onAuthStateChanged } from 'firebase/auth'; 
 
 export default function Salidas({ navigation }) {
-    const [inputValue, setInputValue] = useState(''); // Cantidad de la salida
-    const [inputTexto, setInputTexto] = useState(''); // Descripción de la salida
-    const [salidasList, setSalidasList] = useState([]); // Lista de salidas para mostrar (las del mes actual)
-    const [loading, setLoading] = useState(false); // Estado de carga para el botón de agregar
-    const [currentUserId, setCurrentUserId] = useState(null); // UID del usuario actual
-    const [totalSalidas, setTotalSalidas] = useState(0); // Suma total de todas las salidas del mes
+    const [inputValue, setInputValue] = useState('');
+    const [inputTexto, setInputTexto] = useState('');
+    const [salidasList, setSalidasList] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState(null);
+    const [totalSalidas, setTotalSalidas] = useState(0);
 
-    // --- Helper para calcular el inicio y fin del mes actual ---
     const getMonthBounds = () => {
         const now = new Date();
         const year = now.getFullYear();
-        const month = now.getMonth(); // 0-indexed (0 para enero, 11 para diciembre)
-
-        // Inicio del mes: primer día del mes actual, 00:00:00.000
+        const month = now.getMonth();
         const startOfMonth = new Date(year, month, 1);
-        // Fin del mes: último día del mes actual, 23:59:59.999
         const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999); 
-        
         return { startOfMonth, endOfMonth };
     };
 
-    // --- Parte 1: Obtener el UID del usuario actual ---
     useEffect(() => {
         const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
             if (user) {
                 setCurrentUserId(user.uid);
             } else {
                 setCurrentUserId(null);
-                // Si el usuario no está logueado, puedes redirigirlo
-                // navigation.replace('Login'); 
             }
         });
         return () => unsubscribeAuth(); 
     }, []);
 
-    // --- Parte 2: Escuchar cambios en las salidas del usuario (real-time) para el mes actual ---
     useEffect(() => {
         if (!currentUserId) {
-            setSalidasList([]); // Limpia la lista si no hay usuario
-            setTotalSalidas(0); // Reinicia el total
+            setSalidasList([]);
+            setTotalSalidas(0);
             return; 
         }
 
         const { startOfMonth, endOfMonth } = getMonthBounds();
-        // *** Colección para 'salidas' ***
         const salidasCollectionRef = collection(db, 'users', currentUserId, 'salidas');
         
         let unsubscribeRecent = () => {}; 
         let unsubscribeTotal = () => {}; 
 
-        // Listener 1: Consulta para obtener *todas* las salidas del mes actual, ordenadas por fecha descendente
-        // *** Usamos 'where' para filtrar por rango de fechas ***
         const qCurrentMonth = query(
             salidasCollectionRef, 
-            where('fecha', '>=', startOfMonth), 
-            where('fecha', '<=', endOfMonth),   
-            orderBy('fecha', 'desc')            
+            where('creadoEn', '>=', startOfMonth), 
+            where('creadoEn', '<=', endOfMonth),   
+            orderBy('creadoEn', 'desc')            
         );
 
         unsubscribeRecent = onSnapshot(qCurrentMonth, (snapshot) => { 
@@ -75,8 +61,7 @@ export default function Salidas({ navigation }) {
                 fetchedSalidas.push({
                     id: doc.id,
                     ...data,
-                    // Convierte el Timestamp de Firestore a un objeto Date y lo formatea
-                    fecha: data.fecha?.toDate ? data.fecha.toDate().toLocaleDateString('es-CO') : 'Fecha desconocida'
+                    fecha: data.creadoEn?.toDate ? data.creadoEn.toDate().toLocaleDateString('es-CO') : 'Fecha desconocida'
                 });
             });
             setSalidasList(fetchedSalidas);
@@ -85,12 +70,10 @@ export default function Salidas({ navigation }) {
             Alert.alert("Error", "No se pudieron cargar tus salidas del mes. Inténtalo de nuevo.");
         });
 
-        // Listener 2: Consulta para calcular el total acumulado de *todas* las salidas del mes actual
-        // *** También aplicamos el filtro de fecha al total ***
         const qTotalCurrentMonth = query(
             salidasCollectionRef,
-            where('fecha', '>=', startOfMonth),
-            where('fecha', '<=', endOfMonth)
+            where('creadoEn', '>=', startOfMonth),
+            where('creadoEn', '<=', endOfMonth)
         ); 
 
         unsubscribeTotal = onSnapshot(qTotalCurrentMonth, (snapshot) => { 
@@ -105,14 +88,12 @@ export default function Salidas({ navigation }) {
             Alert.alert("Error", "No se pudo calcular el total de tus salidas del mes. Inténtalo de nuevo.");
         });
 
-        // Limpia AMBOS listeners de Firestore cuando el componente se desmonte o el UID cambie
         return () => {
             unsubscribeRecent();
             unsubscribeTotal();
         };
-    }, [currentUserId]); // Este efecto se vuelve a ejecutar si el UID del usuario cambia
+    }, [currentUserId]); 
 
-    // --- Parte 3: Función para guardar una nueva salida en Firestore ---
     const handleAddSalida = async () => {
         if (!currentUserId) {
             Alert.alert('Error', 'No hay un usuario logueado para registrar salidas.');
@@ -131,11 +112,10 @@ export default function Salidas({ navigation }) {
         setLoading(true); 
 
         try {
-            // *** Colección para 'salidas' ***
             const addDocPromise = addDoc(collection(db, 'users', currentUserId, 'salidas'), {
                 descripcion: inputTexto.trim(),
                 cantidad: cantidad,
-                fecha: new Date(), 
+                creadoEn: new Date(), 
             });
 
             const TIMEOUT_DURATION = 15000; 
@@ -181,7 +161,6 @@ export default function Salidas({ navigation }) {
                 </View>
                 <View style={styles.valores}>
                     <Text style={styles.numero}>$</Text>
-                    {/* Muestra el total de TODAS las salidas del mes, formateado a moneda local */}
                     <Text style={styles.numero}>{totalSalidas.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text> 
                 </View>
                 <View style={styles.formulario}>

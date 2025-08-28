@@ -1,14 +1,19 @@
-// src/lib/firebase.js  (o donde decidas ubicarlo)
+// src/lib/firebase.js
 
 // 1. Importa las funciones necesarias de Firebase SDK
 import { initializeApp } from 'firebase/app'; // Para inicializar la app de Firebase
-import { getAuth } from 'firebase/auth';     // Para el servicio de autenticación
+
+// === CAMBIOS AQUÍ para la persistencia de React Native ===
+// Antes: import { getAuth } from 'firebase/auth';
+// Ahora: Usaremos 'initializeAuth' y 'getReactNativePersistence'
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+// Importa el almacenamiento asíncrono para React Native
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+// =======================================================
+
 import { getFirestore } from 'firebase/firestore'; // Para el servicio de base de datos Cloud Firestore
 
 // 2. Tu objeto de configuración de Firebase
-// ESTO ES CRUCIAL: Debes reemplazar los valores de los marcadores de posición
-// con tu propia configuración que obtuviste de la Consola de Firebase.
-// (Cuando registraste tu app en el Paso 3)
 const firebaseConfig = {
   apiKey: "AIzaSyAX4zQ_Pgp7HcHgonj6kRYU8trljn41eNQ",
   authDomain: "cash-51666.firebaseapp.com",
@@ -20,13 +25,18 @@ const firebaseConfig = {
 };
 
 // 3. Inicializa tu aplicación de Firebase
-// Esta es la parte donde Firebase se conecta con tu proyecto.
 const app = initializeApp(firebaseConfig);
 
 // 4. Obtén las instancias de los servicios de Firebase que vas a usar
-// Exportamos estas instancias para que puedas usarlas fácilmente
-// en cualquier parte de tu aplicación sin reinicializar Firebase.
-export const auth = getAuth(app);       // Instancia para Firebase Authentication
+
+// === CAMBIO CLAVE AQUÍ para la persistencia ===
+// Antes: export const auth = getAuth(app);
+// Ahora: Inicializamos la autenticación con la persistencia de AsyncStorage
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+});
+// ===============================================
+
 export const db = getFirestore(app);   // Instancia para Cloud Firestore
 
 // ¡Eso es todo! Este archivo es tu puerta de entrada a Firebase.
