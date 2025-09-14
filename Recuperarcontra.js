@@ -4,7 +4,7 @@ import AntDesign from '@expo/vector-icons/AntDesign';
 import { sendPasswordResetEmail } from 'firebase/auth'; 
 import { auth } from './firebase'; 
 
-export default function PasswordResetScreen({ navigation }) {
+export default function Recuperarcontra({ navigation }) {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -51,7 +51,7 @@ export default function PasswordResetScreen({ navigation }) {
             <View style={styles.container}>
                 <View style={styles.nav}>
                     <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <AntDesign name="leftcircleo" size={30} color="black" />
+                        <AntDesign name="left-circle" size={30} color="black" />
                     </TouchableOpacity>
                 </View>
                 <View style={styles.header}>

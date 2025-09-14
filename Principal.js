@@ -18,7 +18,9 @@ import Metas from './Metas';
 import Historial from './historial';
 import LoginScreen from './login';
 import RegistroScreen from './registro';
-import PasswordResetScreen from './PasswordResetScreen';
+import PasswordResetScreen from './Recuperarcontra';
+import Registro from './registro';
+import Recuperarcontra from './Recuperarcontra';
 
 const Stack = createNativeStackNavigator();
 
@@ -265,8 +267,8 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="Registro" component={RegistroScreen} />
-          <Stack.Screen name="PasswordReset" component={PasswordResetScreen} />
+          <Stack.Screen name="Registro" component={Registro} />
+          <Stack.Screen name="Recuperarcontra" component={Recuperarcontra} />
         </Stack.Navigator>
       </NavigationContainer>
     );

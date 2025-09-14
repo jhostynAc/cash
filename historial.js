@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, SafeAreaView, TextInput, ActivityIndicator, Alert } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
@@ -13,6 +13,13 @@ export default function Historial({ navigation }) {
     const [combinedHistory, setCombinedHistory] = useState([]);
     const [filteredHistory, setFilteredHistory] = useState([]);
 
+    // useRef para mantener los datos más recientes de cada colección sin causar re-renders excesivos
+    const dataSources = useRef({
+        ingresos: [],
+        salidas: [],
+        metas: []
+    });
+
     useEffect(() => {
         const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
             if (user) {
@@ -21,7 +28,8 @@ export default function Historial({ navigation }) {
                 setCurrentUserId(null);
                 setLoading(false);
                 Alert.alert("Error", "Necesitas iniciar sesión para ver el historial.");
-                navigation.replace('Login');
+                // Navegar al login si no hay usuario autenticado
+                navigation.replace('Login'); 
             }
         });
         return () => unsubscribeAuth();
@@ -36,16 +44,38 @@ export default function Historial({ navigation }) {
 
         setLoading(true);
 
+        // Función para actualizar la historia combinada después de cada snapshot
+        const updateCombinedHistory = (newData, type) => {
+            dataSources.current[type] = newData;
+            const allData = [
+                ...dataSources.current.ingresos,
+                ...dataSources.current.salidas,
+                ...dataSources.current.metas
+            ];
+            // Ordenar por fecha (más reciente primero)
+            allData.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+            setCombinedHistory(allData);
+            setLoading(false);
+        };
+
+        // Escucha en tiempo real para ingresos
         const unsubscribeIncome = onSnapshot(
             query(collection(db, 'users', currentUserId, 'ingresos'), orderBy('creadoEn', 'desc')),
             (snapshot) => {
-                const incomes = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    type: 'ingreso',
-                    ...doc.data(),
-                    timestamp: doc.data().creadoEn?.toDate ? doc.data().creadoEn.toDate() : new Date(),
-                    displayAmount: `+$${parseFloat(doc.data().cantidad || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-                }));
+                const incomes = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        type: 'ingreso',
+                        // Solución: Aseguramos que 'descripcion' siempre exista para los ingresos
+                        // Usamos la que viene de Firestore, o una categoría, o un texto por defecto
+                        descripcion: data.descripcion || data.categoria || 'Ingreso General', 
+                        cantidad: parseFloat(data.cantidad || 0), // Almacenamos la cantidad numérica para la búsqueda numérica
+                        ...data, // Incluimos el resto de los datos originales
+                        timestamp: data.creadoEn?.toDate ? data.creadoEn.toDate() : new Date(),
+                        displayAmount: `+$${parseFloat(data.cantidad || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                    };
+                });
                 updateCombinedHistory(incomes, 'ingresos');
             },
             (error) => {
@@ -55,16 +85,22 @@ export default function Historial({ navigation }) {
             }
         );
 
+        // Escucha en tiempo real para salidas
         const unsubscribeOutcome = onSnapshot(
             query(collection(db, 'users', currentUserId, 'salidas'), orderBy('creadoEn', 'desc')),
             (snapshot) => {
-                const outcomes = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    type: 'salida',
-                    ...doc.data(),
-                    timestamp: doc.data().creadoEn?.toDate ? doc.data().creadoEn.toDate() : new Date(),
-                    displayAmount: `-$${parseFloat(doc.data().cantidad || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-                }));
+                const outcomes = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        type: 'salida',
+                        descripcion: data.descripcion || data.categoria || 'Gasto General', // También aseguramos descripción
+                        cantidad: parseFloat(data.cantidad || 0), // Almacenamos la cantidad numérica
+                        ...data,
+                        timestamp: data.creadoEn?.toDate ? data.creadoEn.toDate() : new Date(),
+                        displayAmount: `-$${parseFloat(data.cantidad || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                    };
+                });
                 updateCombinedHistory(outcomes, 'salidas');
             },
             (error) => {
@@ -74,17 +110,23 @@ export default function Historial({ navigation }) {
             }
         );
 
+        // Escucha en tiempo real para metas
         const unsubscribeGoals = onSnapshot(
             query(collection(db, 'users', currentUserId, 'metas'), orderBy('creadoEn', 'desc')),
             (snapshot) => {
-                const goals = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    type: 'meta',
-                    ...doc.data(),
-                    timestamp: doc.data().creadoEn?.toDate ? doc.data().creadoEn.toDate() : new Date(),
-                    displayAmount: `$${parseFloat(doc.data().cantidad || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Meta)`,
-                    displayDescription: `Meta: ${doc.data().nombre || 'Sin nombre'}`,
-                }));
+                const goals = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        type: 'meta',
+                        // Solución: Usamos el nombre de la meta como descripción para la búsqueda
+                        descripcion: `Meta: ${data.nombre || 'Sin nombre'}`,
+                        cantidad: parseFloat(data.aporte || 0), // Las metas se registran con 'aporte'
+                        ...data,
+                        timestamp: data.creadoEn?.toDate ? data.creadoEn.toDate() : new Date(),
+                        displayAmount: `$${parseFloat(data.aporte || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Meta)`,
+                    };
+                });
                 updateCombinedHistory(goals, 'metas');
             },
             (error) => {
@@ -101,36 +143,33 @@ export default function Historial({ navigation }) {
         };
     }, [currentUserId]);
 
-    const dataSources = React.useRef({
-        ingresos: [],
-        salidas: [],
-        metas: []
-    });
-
-    const updateCombinedHistory = (newData, type) => {
-        dataSources.current[type] = newData;
-        const allData = [
-            ...dataSources.current.ingresos,
-            ...dataSources.current.salidas,
-            ...dataSources.current.metas
-        ];
-        allData.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-        setCombinedHistory(allData);
-        setLoading(false);
-    };
-
+    // Efecto para filtrar la historia cuando el término de búsqueda o la historia combinada cambian
     useEffect(() => {
         if (search.trim() === '') {
             setFilteredHistory(combinedHistory);
         } else {
             const lowercasedSearch = search.toLowerCase();
+            
+            // Intentamos parsear el término de búsqueda como un número para comparaciones numéricas
+            // Reemplazamos la coma por el punto para manejar ambos separadores decimales comunes
+            const searchNumeric = parseFloat(lowercasedSearch.replace(',', '.'));
+            const isNumericSearch = !isNaN(searchNumeric); // Bandera para saber si la búsqueda es numérica
+
             const filtered = combinedHistory.filter(item => {
-                const description = item.type === 'meta' ? item.displayDescription : (item.descripcion || '').toLowerCase();
-                const amount = item.displayAmount || '';
-                const name = item.nombre || '';
-                return description.includes(lowercasedSearch) ||
-                       amount.includes(lowercasedSearch) ||
-                       name.toLowerCase().includes(lowercasedSearch);
+                // Ahora, 'item.descripcion' siempre estará disponible y será el valor a buscar
+                const itemDescription = (item.descripcion || '').toLowerCase();
+                
+                // Búsqueda en la cadena del monto ya formateado (ej. "+$1.234,56")
+                const formattedAmountText = (item.displayAmount || '').toLowerCase();
+
+                // Coincidencia de la descripción, del monto formateado, o del monto numérico crudo
+                const descriptionMatch = itemDescription.includes(lowercasedSearch);
+                const formattedAmountMatch = formattedAmountText.includes(lowercasedSearch);
+                
+                // Coincidencia numérica: solo si el término de búsqueda es un número válido y coincide con la cantidad numérica del ítem
+                const rawAmountMatch = isNumericSearch && item.cantidad !== undefined && item.cantidad === searchNumeric;
+
+                return descriptionMatch || formattedAmountMatch || rawAmountMatch;
             });
             setFilteredHistory(filtered);
         }
@@ -159,7 +198,7 @@ export default function Historial({ navigation }) {
             <View style={styles.container}>
                 <View style={styles.nav}>
                     <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <AntDesign name="leftcircleo" size={30} color="black" />
+                        <AntDesign name="left-circle" size={30} color="black" />
                     </TouchableOpacity>
                 </View>
                 <View style={styles.bienvenida}>
@@ -174,9 +213,9 @@ export default function Historial({ navigation }) {
                     />
                     <TouchableOpacity
                         style={styles.botonBuscar}
-                        onPress={() => {}}
+                        onPress={() => {}} // Este botón no necesita acción si onChangeText ya filtra
                     >
-                        <AntDesign name="search1" size={20} color="#fff" />
+                        <AntDesign name="search" size={20} color="#fff" />
                     </TouchableOpacity>
                 </View>
                 <ScrollView style={styles.tabla}>
@@ -188,14 +227,22 @@ export default function Historial({ navigation }) {
                     </View>
                     {filteredHistory.length > 0 ? (
                         filteredHistory.map((item) => (
-                            <View key={item.id} style={[styles.info, item.type === 'ingreso' ? styles.ingresoBackground : item.type === 'salida' ? styles.salidaBackground : styles.metaBackground]}>
+                            <View 
+                                key={item.id} 
+                                // Usamos item.type para aplicar los estilos de fondo
+                                style={[
+                                    styles.info, 
+                                    item.type === 'ingreso' ? styles.ingresoBackground : 
+                                    item.type === 'salida' ? styles.salidaBackground : 
+                                    styles.metaBackground
+                                ]}
+                            >
                                 <Text style={styles.itemText}>{item.type === 'ingreso' ? 'Ingreso' : item.type === 'salida' ? 'Salida' : 'Meta'}</Text>
                                 <Text style={[styles.itemText, item.type === 'ingreso' ? styles.ingresoColor : styles.salidaColor]}>
                                     {item.displayAmount}
                                 </Text>
-                                <Text style={styles.itemText}>
-                                    {item.type === 'meta' ? item.displayDescription : item.descripcion}
-                                </Text>
+                                {/* Ahora item.descripcion contiene la descripción correcta para todos */}
+                                <Text style={styles.itemText}>{item.descripcion}</Text>
                                 <Text style={styles.itemText}>{formatDate(item.timestamp)}</Text>
                             </View>
                         ))

@@ -153,7 +153,7 @@ export default function Ingresos({ navigation }) {
             <View style={styles.container}>
                 <View style={styles.nav}>
                     <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <AntDesign name="leftcircleo" size={30} color="black" />
+                        <AntDesign name="left-circle" size={30} color="black" />
                     </TouchableOpacity>
                 </View>
                 <View style={styles.bienvenida}>

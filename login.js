@@ -76,10 +76,10 @@ export default function Login({ navigation }) {
                             </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity onPress={() => navigation.navigate('PasswordResetScreen')}>
+                        <TouchableOpacity onPress={() => navigation.navigate('Recuperarcontra')}>
                             <Text style={styles.textoLink}>¿Olvidaste tu contraseña?</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => navigation.navigate('registro')}>
+                        <TouchableOpacity onPress={() => navigation.navigate('Registro')}>
                             <Text style={styles.textoLink}>Registrarse</Text>
                         </TouchableOpacity>
                     </View>
